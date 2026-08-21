@@ -7,7 +7,11 @@ authors = [
     { name = "IbanLatasa", email = "ibanlatasa69@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "datasets>=5.0.1",
+    "tokenizer>=3.6.4",
+    "tokenizers>=0.23.1",
+]
 
 [project.scripts]
 tinyllm = "tinyllm:main"

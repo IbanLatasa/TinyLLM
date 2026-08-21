@@ -14,7 +14,7 @@ evolve it into a production-oriented system.
 
 ## Project status
 
-Milestone 1 - Repository setup
+Milestone 2 - Data
 
 ## Roadmap
 
