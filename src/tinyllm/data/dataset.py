@@ -4,7 +4,14 @@ from torch.utils.data import Dataset
 
 
 class LanguageModelDataset(Dataset):
-    def __init__(self, stories: list[list[int]], context_length: int, eos_id: int, bos_id: int, pad_id: int) -> None:
+    def __init__(
+        self,
+        stories: list[list[int]],
+        context_length: int,
+        eos_id: int,
+        bos_id: int,
+        pad_id: int,
+    ) -> None:
         if context_length <= 0:
             raise ValueError("Context length must be greater that 0")
 
@@ -15,8 +22,8 @@ class LanguageModelDataset(Dataset):
         for story in stories:
             tokens = [bos_id, *story, eos_id]
 
-            for start in range(0, len(tokens)-1, self.context_length):
-                chunk = tokens[start: start + context_length + 1]
+            for start in range(0, len(tokens) - 1, self.context_length):
+                chunk = tokens[start : start + context_length + 1]
 
                 if len(chunk) < context_length + 1:
                     padding_lenght = context_length + 1 - len(chunk)
@@ -33,4 +40,4 @@ class LanguageModelDataset(Dataset):
         x = torch.tensor(chunk[:-1], dtype=torch.long)
         y = torch.tensor(chunk[1:], dtype=torch.long)
 
-        return x,y
+        return x, y
