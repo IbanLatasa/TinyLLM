@@ -20,7 +20,7 @@ class TransformerBlock(nn.Module):
 
         self.mlp = MLP(embedding_dim=embedding_dim)
 
-    def feed_forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         x = x + self.attention(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
 
