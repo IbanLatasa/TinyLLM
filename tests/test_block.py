@@ -1,6 +1,5 @@
 import torch
 
-
 from tinyllm.model.block import TransformerBlock
 
 
@@ -16,4 +15,3 @@ def test_transformer_block_preserves_shape() -> None:
     output = block(x)
 
     assert output.shape == x.shape
-
