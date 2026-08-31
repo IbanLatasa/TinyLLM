@@ -8,7 +8,7 @@ class MLP(nn.Module):
         hidden_dim = 4 * embedding_dim
 
         self.layers = nn.Sequential(
-            nn.linear(embedding_dim, hidden_dim),
+            nn.Linear(embedding_dim, hidden_dim),
             nn.GELU(),
             nn.Linear(hidden_dim, embedding_dim),
         )
