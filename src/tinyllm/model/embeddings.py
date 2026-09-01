@@ -6,7 +6,7 @@ class GPTEmbeddings(nn.Module):
     def __init__(
         self, vocab_size: int, embedding_dim: int, context_length: int
     ) -> None:
-        super.__init__()
+        super().__init__()
 
         self.token_embedding = nn.Embedding(vocab_size, embedding_dim)
         self.position_embedding = nn.Embedding(context_length, embedding_dim)
