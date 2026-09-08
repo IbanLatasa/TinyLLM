@@ -8,6 +8,7 @@ from tokenizers.trainers import BpeTrainer
 
 SPECIAL_TOKENS = [
     "<unk>",
+    "<bos>",
     "<eos>",
     "<pad>",
 ]
@@ -28,6 +29,17 @@ class TinyLLMTokenizer:
 
     def decode(self, token_ids: list[int]) -> str:
         return self.tokenizer.decode(token_ids)
+
+    def token_to_id(self, token: str) -> int:
+        token_id = self.tokenizer.token_to_id(token)
+
+        if token_id is None:
+            raise ValueError(f"Unknown token: {token}")
+
+        return token_id
+
+    def vocab_size(self) -> int:
+        return self.tokenizer.get_vocab_size()
 
 
 def train_tokenizer(

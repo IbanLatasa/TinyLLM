@@ -1,34 +1,59 @@
+import json
 from pathlib import Path
 
-from datasets import load_dataset
-
-OUTPUT_DIR = Path("data/processed")
+from datasets import Dataset, load_dataset
 
 
-def save_split(dataset_split, output_path: Path) -> int:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+def save_split(
+    dataset_split: Dataset,
+    output_path: Path,
+) -> int:
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    saved_stories = 0
+    stories_saved = 0
 
     with output_path.open("w", encoding="utf-8") as file:
-        for story in dataset_split:
-            text = story["text"].strip()
+        for sample in dataset_split:
+            text = sample["text"]
 
-            if text:
-                file.write(text)
-                saved_stories += 1
+            if not text.strip():
+                continue
 
-    return saved_stories
+            record = {
+                "text": text,
+            }
+
+            file.write(
+                json.dumps(
+                    record,
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+            stories_saved += 1
+
+    return stories_saved
 
 
 def main() -> None:
-    ds = load_dataset("roneneldan/TinyStories")
+    dataset = load_dataset("roneneldan/TinyStories")
 
-    train_count = save_split(ds["train"], OUTPUT_DIR / "train.txt")
-    val_count = save_split(ds["validation"], OUTPUT_DIR / "validation.txt")
+    train_count = save_split(
+        dataset["train"],
+        Path("data/processed/train.jsonl"),
+    )
 
-    print(f"Saved train split: {train_count:,} stories")
-    print(f"Saved validation split: {val_count:,} stories")
+    validation_count = save_split(
+        dataset["validation"],
+        Path("data/processed/validation.jsonl"),
+    )
+
+    print(f"Train stories: {train_count}")
+    print(f"Validation stories: {validation_count}")
 
 
 if __name__ == "__main__":
