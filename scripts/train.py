@@ -61,8 +61,6 @@ def main() -> None:
 
     vocab_size = tokenizer.vocab_size()
 
-    print("Estoy en train dataset")
-
     train_dataset = LanguageModelDataset(
         stories=train_stories,
         context_length=context_length,
@@ -70,8 +68,6 @@ def main() -> None:
         eos_id=eos_token_id,
         pad_id=pad_token_id,
     )
-
-    print("Estoy en validation dataset")
 
     validation_dataset = LanguageModelDataset(
         stories=validation_stories,
@@ -81,11 +77,7 @@ def main() -> None:
         pad_id=pad_token_id,
     )
 
-    print("Estoy en train loader")
-
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-    print("Estoy en validation loader")
 
     validation_loader = DataLoader(validation_dataset, batch_size=batch_size)
 
