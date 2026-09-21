@@ -1,3 +1,4 @@
+import argparse
 import json
 from pathlib import Path
 
@@ -7,11 +8,24 @@ from torch.utils.data import DataLoader
 from tinyllm.data.dataset import LanguageModelDataset
 from tinyllm.model.gpt import GPT
 from tinyllm.tokenizer.bpe import TinyLLMTokenizer
-from tinyllm.training.checkpoint import save_checkpoint
+from tinyllm.training.checkpoint import load_checkpoint, save_checkpoint
 from tinyllm.training.loss import LanguageModelLoss
 from tinyllm.training.metrics import perplexity
 from tinyllm.training.optimizer import create_optimizer
 from tinyllm.training.trainer import train_epoch, validate
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train TinyLLM")
+
+    parser.add_argument(
+        "--resume",
+        type=Path,
+        default=None,
+        help="Checkpoint from which to resume training",
+    )
+
+    return parser.parse_args()
 
 
 def load_stories(
@@ -37,23 +51,36 @@ def load_stories(
 
 
 def main() -> None:
+    args = parse_args()
+
     tokenizer_path = Path("artifacts/tokenizer/tokenizer.json")
     train_path = Path("data/processed/train.jsonl")
     validation_path = Path("data/processed/validation.jsonl")
+    checkpoint_dir = Path("artifacts/checkpoints")
 
+    # Model conf
     context_length = 128
     embedding_dim = 128
     num_heads = 4
     num_layers = 4
+
+    # Training conf
     batch_size = 16
     learning_rate = 3e-4
-    num_epochs = 5
+
+    max_steps = 500_000
+    log_every = 1000
+    checkpoint_every = 50_000
+
+    use_amp = True
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     tokenizer = TinyLLMTokenizer.from_file(tokenizer_path)
 
-    train_stories = load_stories(train_path, tokenizer, max_stories=10000)
+    train_stories = load_stories(train_path, tokenizer)
 
-    validation_stories = load_stories(validation_path, tokenizer, max_stories=10000)
+    validation_stories = load_stories(validation_path, tokenizer)
 
     bos_token_id = tokenizer.token_to_id("<bos>")
     eos_token_id = tokenizer.token_to_id("<eos>")
@@ -77,11 +104,25 @@ def main() -> None:
         pad_id=pad_token_id,
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    pin_memory = device.type == "cuda"
 
-    validation_loader = DataLoader(validation_dataset, batch_size=batch_size)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=pin_memory,
+        # persistent_workers=True,
+    )
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    validation_loader = DataLoader(
+        validation_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=0,
+        pin_memory=pin_memory,
+        # persistent_workers=True,
+    )
 
     model = GPT(
         vocab_size=vocab_size,
@@ -95,49 +136,131 @@ def main() -> None:
 
     optimizer = create_optimizer(model, learning_rate=learning_rate)
 
+    model_config = {
+        "vocab_size": vocab_size,
+        "embedding_dim": embedding_dim,
+        "context_length": context_length,
+        "num_heads": num_heads,
+        "num_layers": num_layers,
+    }
+
+    start_step = 0
+    scaler_state_dict = None
+
+    if args.resume is not None:
+        if not args.resume.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {args.resume}")
+
+        checkpoint = load_checkpoint(
+            path=args.resume, model=model, optimizer=optimizer, device=device
+        )
+
+        checkpoint_config = checkpoint["model_config"]
+
+        if checkpoint_config != model_config:
+            raise ValueError(
+                "Checkpoint model configuration "
+                "does not match current model configuration"
+            )
+
+        start_step = checkpoint["step"]
+
+        scaler_state_dict = checkpoint.get("scaler_state_dict")
+
+        print(f"Resuming from: {args.resume}")
+        print(f"Startint at step: {start_step}")
+
+    num_parameters = sum(parameter.numel() for parameter in model.parameters())
+
+    print()
+    print("TinyLLM Training")
+    print("-----------------")
     print(f"Device: {device}")
+    print(f"AMP: {use_amp and device.type == 'cuda'}")
     print(f"Vocabulary size: {vocab_size}")
     print(f"Training stories: {len(train_stories)}")
     print(f"Validation stories: {len(validation_stories)}")
     print(f"Training samples: {len(train_dataset)}")
     print(f"Validation samples: {len(validation_dataset)}")
-
-    num_parameters = sum(parameter.numel() for parameter in model.parameters())
-
     print(f"Model parameters: {num_parameters:,}")
+    print(f"Batch size: {batch_size}")
+    print(f"Max steps: {max_steps:,}")
+    print(f"Checkpoint every: {checkpoint_every}")
+    print()
 
-    for epoch in range(num_epochs):
-        train_loss = train_epoch(
-            model=model,
-            dataloader=train_loader,
-            loss_fn=loss_fn,
-            optimizer=optimizer,
-            device=device,
-        )
-
-        validation_loss = validate(
-            model=model, dataloader=validation_loader, loss_fn=loss_fn, device=device
-        )
-
-        train_ppl = perplexity(train_loss)
-        validation_ppl = perplexity(validation_loss)
-
-        print(
-            f"Epoch {epoch + 1}/{num_epochs} "
-            f"| train_loss={train_loss:.4f} "
-            f"| train_ppl={train_ppl:.2f} "
-            f"| val_loss={validation_loss:.4f} "
-            f"| val_ppl={validation_ppl:.2f}"
-        )
+    def save_intermediate_checkpoint(
+        step: int, train_loss: float, tokens_per_second: float, scaler_state: dict
+    ) -> None:
+        path = checkpoint_dir / f"step_{step:06d}.pt"
 
         save_checkpoint(
-            path=Path("artifacts/checkpoints/latest.pt"),
+            path=path,
             model=model,
             optimizer=optimizer,
-            epoch=epoch,
+            step=step,
             train_loss=train_loss,
-            validation_loss=validation_loss,
+            validation_loss=None,
+            model_config=model_config,
+            scaler_state_dict=scaler_state,
         )
+
+        print(f"Checkpoint saved: {path} | tokens/s={tokens_per_second:,.0f}")
+
+    train_loss, tokens_per_second, final_scaler_state = train_epoch(
+        model=model,
+        dataloader=train_loader,
+        loss_fn=loss_fn,
+        optimizer=optimizer,
+        device=device,
+        max_steps=max_steps,
+        pad_token=pad_token_id,
+        use_amp=use_amp,
+        log_every=log_every,
+        checkpoint_every=checkpoint_every,
+        start_step=start_step,
+        scaler_state_dict=scaler_state_dict,
+        on_checkpoint=save_intermediate_checkpoint,
+    )
+
+    print()
+    print("Running validation...")
+
+    validation_loss = validate(
+        model=model,
+        dataloader=validation_loader,
+        loss_fn=loss_fn,
+        device=device,
+        pad_token_id=pad_token_id,
+    )
+
+    train_ppl = perplexity(train_loss)
+
+    validation_ppl = perplexity(validation_loss)
+
+    print()
+    print("Training complete")
+    print("------------------")
+    print(f"Steps: {max_steps:,}")
+    print(f"Train loss: {train_loss}")
+    print(f"Train ppl: {train_ppl}")
+    print(f"Validation loss: {validation_loss}")
+    print(f"Validation ppl: {validation_ppl}")
+    print(f"Throughput: {tokens_per_second:,.0f} tokens/s")
+
+    final_checkpoint_path = checkpoint_dir / "latest.pt"
+
+    save_checkpoint(
+        path=final_checkpoint_path,
+        model=model,
+        optimizer=optimizer,
+        step=max_steps,
+        train_loss=train_loss,
+        validation_loss=validation_loss,
+        model_config=model_config,
+    )
+
+    print()
+    print(f"Final checkpoint saved to: {final_checkpoint_path}")
 
 
 if __name__ == "__main__":

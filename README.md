@@ -14,12 +14,12 @@ evolve it into a production-oriented system.
 
 ## Project status
 
-Milestone 4 - Training
+Milestone 6 - Model serving
 
 ## Roadmap
 
 - [x] Repository setup
 - [x] Minimal transformer
-- [] Training pipeline
+- [x] Training pipeline
 - [] Inference service
 - [] Production infraestructure
