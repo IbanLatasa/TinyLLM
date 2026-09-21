@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    image: tinyllm:latest
+
+    ports:
+      - "8000:8000"
+    
+    environment:
+      TINYLLM_CHECKPOINT_PATH: /models/step_500000.pt
+      TINYLLM_TOKENIZER_PATH: /tokenizer/tokenizer.json
+
+    volumes:
+      - ./artifacts/checkpoints:/models:ro
+      - ./artifacts/tokenizer:/tokenizer:ro

@@ -15,7 +15,7 @@ def generate_greedy(
     generated = input_ids
 
     for _ in range(max_new_tokens):
-        model_input = generated[:, -context_length]
+        model_input = generated[:, -context_length:]
 
         logits = model(model_input)
 
@@ -48,7 +48,7 @@ def generate_with_temperature(
     generated = input_ids
 
     for _ in range(max_new_tokens):
-        model_input = generated[:, -context_length]
+        model_input = generated[:, -context_length:]
 
         logits = model(model_input)
 
@@ -89,7 +89,7 @@ def generate_with_top_k(
     generated = input_ids
 
     for _ in range(max_new_tokens):
-        model_input = generated[:, -context_length]
+        model_input = generated[:, -context_length:]
 
         logits = model(model_input)
 
