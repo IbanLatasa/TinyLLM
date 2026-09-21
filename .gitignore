@@ -222,4 +222,3 @@ __marimo__/
 
 # Model artifacts
 /artifacts/checkpoints/
-tests/test_inference.py
