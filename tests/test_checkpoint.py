@@ -20,13 +20,19 @@ def test_checkpoint_restores_model(
 
     checkpoint_path = tmp_path / "checkpoint.pt"
 
+    model_config = {
+        "in_features": 4,
+        "out_features": 2,
+    }
+
     save_checkpoint(
         path=checkpoint_path,
         model=model,
         optimizer=optimizer,
-        epoch=2,
+        step=100,
         train_loss=1.5,
         validation_loss=1.7,
+        model_config=model_config,
     )
 
     with torch.no_grad():
@@ -53,13 +59,19 @@ def test_checkpoint_restores_metadata(
 
     checkpoint_path = tmp_path / "checkpoint.pt"
 
+    model_config = {
+        "in_features": 4,
+        "out_features": 2,
+    }
+
     save_checkpoint(
         path=checkpoint_path,
         model=model,
         optimizer=optimizer,
-        epoch=5,
+        step=100,
         train_loss=2.3,
         validation_loss=2.5,
+        model_config=model_config,
     )
 
     checkpoint = load_checkpoint(
@@ -69,6 +81,7 @@ def test_checkpoint_restores_metadata(
         device=torch.device("cpu"),
     )
 
-    assert checkpoint["epoch"] == 5
+    assert checkpoint["step"] == 100
     assert checkpoint["train_loss"] == 2.3
     assert checkpoint["validation_loss"] == 2.5
+    assert checkpoint["model_config"] == model_config

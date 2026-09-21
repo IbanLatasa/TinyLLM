@@ -13,7 +13,11 @@ def test_greedy_generation_adds_tokens() -> None:
         Path("artifacts/checkpoints/latest.pt"), device
     )
 
-    input_ids = torch.tensor([[1, 2]], dtype=torch.long)
+    input_ids = torch.tensor(
+        [[1, 2]],
+        dtype=torch.long,
+        device=device,
+    )
 
     output = generate_greedy(model, input_ids, 3, 8)
 

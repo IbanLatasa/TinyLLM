@@ -48,12 +48,14 @@ def test_train_epoch_updates_model_parameters() -> None:
 
     initial_parameter = next(model.parameters()).detach().clone()
 
-    train_loss = train_epoch(
+    train_loss, perplexity, metrics = train_epoch(
         model=model,
         dataloader=dataloader,
         loss_fn=loss_fn,
         optimizer=optimizer,
         device=torch.device("cpu"),
+        max_steps=len(dataloader),
+        pad_token=pad_token_id
     )
 
     updated_parameter = next(model.parameters()).detach()
@@ -104,12 +106,14 @@ def test_train_epoch_returns_finite_loss() -> None:
         learning_rate=1e-2,
     )
 
-    train_loss = train_epoch(
+    train_loss, perplexity, metrics = train_epoch(
         model=model,
         dataloader=dataloader,
         loss_fn=loss_fn,
         optimizer=optimizer,
         device=torch.device("cpu"),
+        max_steps=len(dataloader),
+        pad_token=pad_token_id
     )
 
     assert isinstance(train_loss, float)
@@ -159,6 +163,7 @@ def test_validate_does_not_update_model_parameters() -> None:
         dataloader=dataloader,
         loss_fn=loss_fn,
         device=torch.device("cpu"),
+        pad_token_id=pad_token_id
     )
 
     final_parameters = list(model.parameters())
